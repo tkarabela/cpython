@@ -952,7 +952,7 @@ class ElementTreeTest(unittest.TestCase):
         elem = ET.XML('<body xmlns="http://effbot.org/ns"><tag/></body>')
         self.assertEqual(
             ET.tostring(elem, encoding='unicode', default_namespace='foobar'),
-            '<ns1:body xmlns="foobar" xmlns:ns1="http://effbot.org/ns"><ns1:tag /></ns1:body>'
+            '<ns0:body xmlns:ns0="http://effbot.org/ns"><ns0:tag /></ns0:body>'
         )
 
     def test_tostring_default_namespace_original_no_namespace(self):
@@ -2124,12 +2124,21 @@ class BugsTest(unittest.TestCase):
             '<elem />'
             '<ns1:elem />'
             '</elem>')
+        self.assertEqual(serialize(e, namespaces={"default": ""}),
+            '<elem xmlns="default" xmlns:ns1="not-default">'
+            '<elem />'
+            '<ns1:elem />'
+            '</elem>')
 
         e = ET.Element("{default}elem")
         s = ET.SubElement(e, "{default}elem")
         s = ET.SubElement(e, "elem") # unprefixed name
         with self.assertRaises(ValueError) as cm:
             serialize(e, default_namespace="default") # 3
+        self.assertEqual(str(cm.exception),
+                'cannot use non-qualified names with default_namespace option')
+        with self.assertRaises(ValueError) as cm:
+            serialize(e, namespaces={"default": ""})
         self.assertEqual(str(cm.exception),
                 'cannot use non-qualified names with default_namespace option')
 
@@ -2213,6 +2222,50 @@ class BugsTest(unittest.TestCase):
 
         ET.register_namespace('test10777', 'http://myuri/')
         ET.register_namespace('test10777', 'http://myuri/')
+
+    def check_issue13378(self):
+        # Pass specific, non-global namespaces to the serializer.
+        elem = ET.XML('<house:iq xmlns:house="http://localhost/house"/>')
+        self.assertEqual(serialize(elem, namespaces={'http://localhost/house': 'house'}),
+                         '<house:iq xmlns:house="http://localhost/house" />')
+        self.assertEqual(serialize(elem),
+                         '<ns0:iq xmlns:ns0="http://localhost/house" />')
+        self.assertEqual(serialize(elem, namespaces={'http://localhost/house': 'home'}),
+                         '<home:iq xmlns:home="http://localhost/house" />')
+
+        # Avoid prefix collisions.
+        elem2 = ET.XML('<doc xml:base="http://example.org/today/">'
+                       '<geo:town xmlns:geo="http://localhost/geo">'
+                       '<house:iq xmlns:house="http://localhost/house"/>'
+                       '</geo:town></doc>')
+        namespaces = {
+            'http://localhost/house': 'house',
+            'http://localhost/home': 'house',
+            'http://localhost/geo': 'geo',
+        }
+        self.assertEqual(serialize(elem2, namespaces=namespaces),
+            '<doc xmlns:geo="http://localhost/geo" '
+            'xmlns:house="http://localhost/house" '
+            'xml:base="http://example.org/today/">'
+            '<geo:town><house:iq /></geo:town></doc>')# doctest: +NORMALIZE_WHITESPACE
+
+        namespaces['http://localhost/house'] = 'geo'
+        with self.assertRaises(ValueError) as cm:
+            serialize(elem2, namespaces=namespaces)
+        self.assertEqual(str(cm.exception),
+                'cannot share the same prefix between two namespaces')
+
+        namespaces['http://localhost/house'] = 'xml'
+        with self.assertRaises(ValueError) as cm:
+            serialize(elem2, namespaces=namespaces)
+        self.assertEqual(str(cm.exception),
+                'cannot share the same prefix between two namespaces')
+
+        self.assertEqual(serialize(elem, namespaces=namespaces), '<xml:iq />')
+
+        namespaces['http://localhost/house'] = ''
+        self.assertEqual(serialize(elem, namespaces=namespaces),
+            '<iq xmlns="http://localhost/house" />')
 
     def test_lost_text(self):
         # Issue #25902: Borrowed text can disappear

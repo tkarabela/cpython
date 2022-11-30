@@ -679,7 +679,8 @@ class ElementTree:
               xml_declaration=None,
               default_namespace=None,
               method=None, *,
-              short_empty_elements=True):
+              short_empty_elements=True,
+              namespaces=None):
         """Write element tree to a file as XML.
 
         Arguments:
@@ -702,6 +703,9 @@ class ElementTree:
                                     tag, otherwise they are emitted as a pair
                                     of start/end tags
 
+          *namespaces* -- a dictionary which maps URI to prefixes in addition
+                          to the global registry
+
         """
         if not method:
             method = "xml"
@@ -722,7 +726,11 @@ class ElementTree:
             if method == "text":
                 _serialize_text(write, self._root)
             else:
-                qnames, namespaces = _namespaces(self._root, default_namespace)
+                # if custom namespaces...
+                namespaces = dict(namespaces or {})
+                if default_namespace:
+                    namespaces[default_namespace] = ""
+                qnames = _qnames(self._root, namespaces)
                 serialize = _serialize[method]
                 serialize(write, self._root, qnames, namespaces,
                           short_empty_elements=short_empty_elements)
@@ -784,17 +792,24 @@ def _get_writer(file_or_filename, encoding):
                 stack.callback(file.detach)
                 yield file.write, encoding
 
-def _namespaces(elem, default_namespace=None):
+def _qnames(elem, namespaces):
     # identify namespaces used in this tree
 
     # maps qnames to *encoded* prefix:local names
     qnames = {None: None}
 
-    # maps uri:s to prefixes
-    namespaces = {}
-    if default_namespace:
-        namespaces[default_namespace] = ""
+    # any uri is mapped to ""?
+    has_default_namespace = ("" in namespaces.values())
+    if namespaces:
+        namespace_map = _namespace_map.copy()
+        namespace_map.update(namespaces)
+        namespaces.clear()
+    else:
+        namespace_map = _namespace_map
+    # Prevent collisions
+    prefixes = set()
 
+    # maps uri:s to prefixes
     def add_qname(qname):
         # calculate serialized qname representation
         try:
@@ -802,9 +817,15 @@ def _namespaces(elem, default_namespace=None):
                 uri, tag = qname[1:].rsplit("}", 1)
                 prefix = namespaces.get(uri)
                 if prefix is None:
-                    prefix = _namespace_map.get(uri)
+                    prefix = namespace_map.get(uri)
                     if prefix is None:
                         prefix = "ns%d" % len(namespaces)
+                    if prefix in prefixes:
+                        raise ValueError(
+                            "cannot share the same prefix "
+                            "between two namespaces"
+                        )
+                    prefixes.add(prefix)
                     if prefix != "xml":
                         namespaces[uri] = prefix
                 if prefix:
@@ -812,7 +833,7 @@ def _namespaces(elem, default_namespace=None):
                 else:
                     qnames[qname] = tag # default element
             else:
-                if default_namespace:
+                if has_default_namespace:
                     # FIXME: can this be handled in XML 1.0?
                     raise ValueError(
                         "cannot use non-qualified names with "
@@ -843,7 +864,7 @@ def _namespaces(elem, default_namespace=None):
         text = elem.text
         if isinstance(text, QName) and text.text not in qnames:
             add_qname(text.text)
-    return qnames, namespaces
+    return qnames
 
 def _serialize_xml(write, elem, qnames, namespaces,
                    short_empty_elements, **kwargs):
@@ -1064,7 +1085,7 @@ def _escape_attrib_html(text):
 
 def tostring(element, encoding=None, method=None, *,
              xml_declaration=None, default_namespace=None,
-             short_empty_elements=True):
+             short_empty_elements=True, namespaces=None):
     """Generate string representation of XML element.
 
     All subelements are included.  If encoding is "unicode", a string
@@ -1073,7 +1094,8 @@ def tostring(element, encoding=None, method=None, *,
     *element* is an Element instance, *encoding* is an optional output
     encoding defaulting to US-ASCII, *method* is an optional output which can
     be one of "xml" (default), "html", "text" or "c14n", *default_namespace*
-    sets the default XML namespace (for "xmlns").
+    sets the default XML namespace (for "xmlns"). *namespaces* is a dictionary
+    which maps URI to prefixes in addition to the global registry.
 
     Returns an (optionally) encoded string containing the XML data.
 
@@ -1083,7 +1105,8 @@ def tostring(element, encoding=None, method=None, *,
                                xml_declaration=xml_declaration,
                                default_namespace=default_namespace,
                                method=method,
-                               short_empty_elements=short_empty_elements)
+                               short_empty_elements=short_empty_elements,
+                               namespaces=namespaces)
     return stream.getvalue()
 
 class _ListDataStream(io.BufferedIOBase):
@@ -1105,14 +1128,15 @@ class _ListDataStream(io.BufferedIOBase):
 
 def tostringlist(element, encoding=None, method=None, *,
                  xml_declaration=None, default_namespace=None,
-                 short_empty_elements=True):
+                 short_empty_elements=True, namespaces=None):
     lst = []
     stream = _ListDataStream(lst)
     ElementTree(element).write(stream, encoding,
                                xml_declaration=xml_declaration,
                                default_namespace=default_namespace,
                                method=method,
-                               short_empty_elements=short_empty_elements)
+                               short_empty_elements=short_empty_elements,
+                               namespaces=namespaces)
     return lst
 
 

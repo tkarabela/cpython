@@ -691,7 +691,7 @@ Functions
 
 .. function:: tostring(element, encoding="us-ascii", method="xml", *, \
                        xml_declaration=None, default_namespace=None, \
-                       short_empty_elements=True)
+                       short_empty_elements=True, namespaces=None)
 
    Generates a string representation of an XML element, including all
    subelements.  *element* is an :class:`Element` instance.  *encoding* [1]_ is
@@ -699,8 +699,9 @@ Functions
    generate a Unicode string (otherwise, a bytestring is generated).  *method*
    is either ``"xml"``, ``"html"`` or ``"text"`` (default is ``"xml"``).
    *xml_declaration*, *default_namespace* and *short_empty_elements* has the same
-   meaning as in :meth:`ElementTree.write`. Returns an (optionally) encoded string
-   containing the XML data.
+   meaning as in :meth:`ElementTree.write`. *namespaces* is a dictionary which
+   maps URI to prefixes in addition to the global registry.Returns an (optionally)
+   encoded string containing the XML data.
 
    .. versionadded:: 3.4
       The *short_empty_elements* parameter.
@@ -712,10 +713,12 @@ Functions
       The :func:`tostring` function now preserves the attribute order
       specified by the user.
 
+   .. versionchanged:: 3.12
+      The *namespaces* argument was added.
 
 .. function:: tostringlist(element, encoding="us-ascii", method="xml", *, \
                            xml_declaration=None, default_namespace=None, \
-                           short_empty_elements=True)
+                           short_empty_elements=True, namespaces=None)
 
    Generates a string representation of an XML element, including all
    subelements.  *element* is an :class:`Element` instance.  *encoding* [1]_ is
@@ -723,9 +726,11 @@ Functions
    generate a Unicode string (otherwise, a bytestring is generated).  *method*
    is either ``"xml"``, ``"html"`` or ``"text"`` (default is ``"xml"``).
    *xml_declaration*, *default_namespace* and *short_empty_elements* has the same
-   meaning as in :meth:`ElementTree.write`. Returns a list of (optionally) encoded
-   strings containing the XML data. It does not guarantee any specific sequence,
-   except that ``b"".join(tostringlist(element)) == tostring(element)``.
+   meaning as in :meth:`ElementTree.write`. *namespaces* is a dictionary which
+   maps URI to prefixes in addition to the global registry.Returns a list of
+   (optionally) encoded strings containing the XML data. It does not guarantee
+   any specific sequence, except that
+   ``b"".join(tostringlist(element)) == tostring(element)``.
 
    .. versionadded:: 3.2
 
@@ -739,6 +744,8 @@ Functions
       The :func:`tostringlist` function now preserves the attribute order
       specified by the user.
 
+   .. versionchanged:: 3.12
+      The *namespaces* argument was added.
 
 .. function:: XML(text, parser=None)
 
@@ -1155,7 +1162,7 @@ ElementTree Objects
 
    .. method:: write(file, encoding="us-ascii", xml_declaration=None, \
                      default_namespace=None, method="xml", *, \
-                     short_empty_elements=True)
+                     short_empty_elements=True, namespaces=None)
 
       Writes the element tree to a file, as XML.  *file* is a file name, or a
       :term:`file object` opened for writing.  *encoding* [1]_ is the output
@@ -1170,6 +1177,8 @@ ElementTree Objects
       of elements that contain no content.  If ``True`` (the default), they are
       emitted as a single self-closed tag, otherwise they are emitted as a pair
       of start/end tags.
+      *namespaces* is a dictionary which maps URI to prefixes in addition to the
+      global registry.
 
       The output is either a string (:class:`str`) or binary (:class:`bytes`).
       This is controlled by the *encoding* argument.  If *encoding* is
@@ -1185,6 +1194,8 @@ ElementTree Objects
          The :meth:`write` method now preserves the attribute order specified
          by the user.
 
+      .. versionchanged:: 3.12
+         The *namespaces* argument was added.
 
 This is the XML file that is going to be manipulated::
 
